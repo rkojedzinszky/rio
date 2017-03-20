@@ -37,6 +37,7 @@ struct thread_info {
 
 static struct thread_info* thread_alloc()
 {
+        int fd;
 	struct thread_info *thread = malloc(sizeof(struct thread_info));
 
 	thread->next = NULL;
@@ -44,6 +45,10 @@ static struct thread_info* thread_alloc()
 	thread->io_done = 0;
 
 	thread->buf = malloc(blocksize);
+
+	fd = open("/dev/urandom", O_RDONLY);
+	read(fd, thread->buf, blocksize);
+	close(fd);
 
 	return thread;
 }
@@ -219,13 +224,10 @@ static void* iothread(struct thread_info *thread)
 {
 	op->open(thread);
 
-	while (1) {
-		int ret = op->op(thread);
+	while (loop) {
+		(void) op->op(thread);
 
 		io_done_inc(thread);
-
-		if (!ret)
-			break;
 	}
 
 	op->close(thread);
@@ -308,7 +310,7 @@ static void stats_loop(struct thread_info *thread)
 		sleep(timeout);
 
 		gettimeofday(&end, NULL);
-		end_io = io_done_get(thread);
+		end_io = io_done_get_all(thread);
 
 		loop = 0;
 
