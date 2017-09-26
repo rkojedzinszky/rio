@@ -136,7 +136,7 @@ static struct op_t sread_ops = {
 
 static void swrite_open(struct thread_info *thread)
 {
-	thread->fd = open(file, O_WRONLY | O_SYNC);
+	thread->fd = open(file, O_WRONLY);
 
 	lseek(thread->fd, thread->block_start * blocksize, SEEK_SET);
 }
@@ -146,6 +146,8 @@ static int swrite_op(struct thread_info *thread)
 	if (write(thread->fd, thread->buf, blocksize) != blocksize) {
 		return 0;
 	}
+
+	(void) fsync(thread->fd);
 
 	if ((uint64_t)lseek(thread->fd, 0, SEEK_CUR) >= thread->block_end * blocksize) {
 		// reset file pointer to beginning of region
@@ -199,7 +201,7 @@ static struct op_t rread_ops = {
 
 static void rwrite_open(struct thread_info *thread)
 {
-	thread->fd = open(file, O_WRONLY | O_SYNC);
+	thread->fd = open(file, O_WRONLY);
 
 	rcommon_open(thread);
 }
@@ -208,7 +210,13 @@ static int rwrite_op(struct thread_info *thread)
 {
 	rcommon_seek(thread);
 
-	return write(thread->fd, thread->buf, blocksize) == blocksize;
+	if (write(thread->fd, thread->buf, blocksize) != blocksize) {
+		return 0;
+	}
+
+	(void) fsync(thread->fd);
+
+	return 1;
 }
 
 static struct op_t rwrite_ops = {
